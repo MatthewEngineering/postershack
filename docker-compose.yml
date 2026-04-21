@@ -1,0 +1,44 @@
+services:
+  comfyui:
+    build:
+      context: ./comfyui
+      dockerfile: Dockerfile
+    container_name: postershack-comfyui
+    restart: unless-stopped
+    ports:
+      - "8188:8188"
+    volumes:
+      - comfyui_models:/workspace/ComfyUI/models
+      - comfyui_output:/workspace/ComfyUI/output
+    environment:
+      - COMFYUI_EXTRA_ARGS=${COMFYUI_EXTRA_ARGS:-}
+      - HF_TOKEN=${HF_TOKEN:-}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-sd15}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8188/system_stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
+  streamlit:
+    build:
+      context: ./streamlit
+      dockerfile: Dockerfile
+    container_name: postershack-streamlit
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - COMFYUI_HOST=comfyui
+      - COMFYUI_PORT=8188
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-sd15}
+    depends_on:
+      comfyui:
+        condition: service_healthy
+
+volumes:
+  comfyui_models:
+    driver: local
+  comfyui_output:
+    driver: local
