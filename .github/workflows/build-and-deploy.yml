@@ -77,7 +77,7 @@ jobs:
         with:
           resourceGroup: postershack-rg
           containerAppName: diffuser-mvp
-          imageToDeploy: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-push.outputs.image_tag }}
+          imageToDeploy: ghcr.io/matthewengineering/postershack/diffuser-mvp:${{ needs.build-push.outputs.image_tag }}
           registryUrl: ${{ env.REGISTRY }}
           registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GHCR_TOKEN }}
