@@ -7,3 +7,11 @@ comfyui/output/
 .DS_Store
 
 .vscode/settings.json
+
+# Terraform
+*.tfvars
+*.tfvars.json
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
