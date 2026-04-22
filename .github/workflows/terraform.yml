@@ -1,0 +1,51 @@
+name: Terraform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app2/terraform/**"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "plan or apply"
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply, destroy]
+
+defaults:
+  run:
+    working-directory: app2/terraform
+
+jobs:
+  terraform:
+    name: Terraform ${{ inputs.action || 'apply' }}
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.5"
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform apply
+        if: ${{ inputs.action != 'plan' && (inputs.action == 'apply' || github.event_name == 'push') }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform destroy
+        if: ${{ inputs.action == 'destroy' }}
+        run: terraform destroy -auto-approve
