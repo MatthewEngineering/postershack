@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/postershack/diffuser-mvp
+  IMAGE_NAME: ${{ github.repository }}/diffuser-mvp
 
 jobs:
   build-push:
@@ -79,7 +79,7 @@ jobs:
           containerAppName: diffuser-mvp
           imageToDeploy: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-push.outputs.image_tag }}
           registryUrl: ${{ env.REGISTRY }}
-          registryUsername: ${{ github.repository_owner }}
+          registryUsername: ${{ github.actor }}
           registryPassword: ${{ secrets.GHCR_TOKEN }}
           environmentVariables: >
             GRADIO_SERVER_NAME=0.0.0.0
