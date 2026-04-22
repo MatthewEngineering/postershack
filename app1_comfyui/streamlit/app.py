@@ -5,7 +5,7 @@ from pathlib import Path
 
 import streamlit as st
 
-import comfyui_client
+import app1_comfyui.streamlit.comfyui_client as comfyui_client
 
 COMFYUI_HOST = os.environ.get("COMFYUI_HOST", "localhost")
 COMFYUI_PORT = int(os.environ.get("COMFYUI_PORT", "8188"))
