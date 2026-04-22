@@ -58,7 +58,7 @@ jobs:
 
 #### ---------------- Configuring Azure credentials for GitHub Actions
 
-### ----- 
+### ----- gather tenant and subscription IDs (from your current login)
 # secrets.AZURE_SUBSCRIPTION_ID
 # secrets.AZURE_TENANT_ID
 
@@ -67,7 +67,7 @@ jobs:
 
 
 
-### -----  service principal 
+### ----- create service principal (basically the identity that GitHub Actions will use to authenticate with Azure)
 # https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade
 
 # secrets.AZURE_CLIENT_ID
