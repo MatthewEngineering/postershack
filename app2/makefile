@@ -61,38 +61,40 @@ shell:
 
 # ── Terraform ─────────────────────────────────────────────────────────────────
 
+TF_DIR := terraform
+
 # Initialize Terraform (downloads providers, sets up backend)
 init:
-	terraform init
+	terraform -chdir=$(TF_DIR) init
 
 # Preview changes without applying (safe diff)
 plan:
-	terraform plan
+	terraform -chdir=$(TF_DIR) plan
 
 # Apply planned changes (creates/updates infra)
 apply:
-	terraform apply
+	terraform -chdir=$(TF_DIR) apply
 
 # Destroy all resources managed by Terraform
 destroy:
-	terraform destroy
+	terraform -chdir=$(TF_DIR) destroy
 
 # Format .tf files for consistency
 fmt:
-	terraform fmt -recursive
+	terraform -chdir=$(TF_DIR) fmt -recursive
 
 # Validate syntax and config
 validate:
-	terraform validate
+	terraform -chdir=$(TF_DIR) validate
 
 # Display current state details
 show:
-	terraform show
+	terraform -chdir=$(TF_DIR) show
 
 # Print defined output variables
 output:
-	terraform output
+	terraform -chdir=$(TF_DIR) output
 
-# Clean local Terraform files (cache, lock file)
+# Clean local Terraform cache
 clean:
-	rm -rf .terraform .terraform.lock.hcl
+	rm -rf $(TF_DIR)/.terraform $(TF_DIR)/.terraform.lock.hcl
