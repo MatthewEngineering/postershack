@@ -23,6 +23,9 @@ jobs:
     name: Terraform ${{ inputs.action || 'apply' }}
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +37,9 @@ jobs:
       - name: Azure login
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Terraform init
         run: terraform init
@@ -49,3 +54,26 @@ jobs:
       - name: Terraform destroy
         if: ${{ inputs.action == 'destroy' }}
         run: terraform destroy -auto-approve
+
+
+
+# ----- 
+# secrets.AZURE_SUBSCRIPTION_ID
+# secrets.AZURE_TENANT_ID
+
+# # Tenant and Subscription IDs (from your current login)
+# az account show --query "{subscriptionId:id, tenantId:tenantId}" -o table
+
+
+
+# ----- 
+# secrets.AZURE_CLIENT_ID
+
+# # Client ID (the service principal you want GitHub to use)
+# az ad sp list --show-mine --query "[].{name:displayName, clientId:appId}" -o table
+# az ad sp list --all -o table
+
+# Create a client ID if needed
+# az ad sp create-for-rbac --name "postershack-github-actions" \
+#   --role contributor \
+#   --scopes /subscriptions/$(az account show --query id -o tsv)
