@@ -63,6 +63,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      packages: read
 
     steps:
       - name: Azure login
@@ -80,7 +81,7 @@ jobs:
           imageToDeploy: ghcr.io/matthewengineering/postershack/diffuser-mvp:${{ needs.build-push.outputs.image_tag }}
           registryUrl: ${{ env.REGISTRY }}
           registryUsername: ${{ github.actor }}
-          registryPassword: ${{ secrets.GHCR_TOKEN }}
+          registryPassword: ${{ secrets.GITHUB_TOKEN }}
           environmentVariables: >
             GRADIO_SERVER_NAME=0.0.0.0
             GRADIO_SERVER_PORT=7860
