@@ -5,3 +5,5 @@ __pycache__/
 comfyui/models/
 comfyui/output/
 .DS_Store
+
+.vscode/settings.json
