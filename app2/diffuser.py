@@ -184,4 +184,4 @@ def build_ui():
 # ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     demo = build_ui()
-    demo.launch(share=False)   # set share=True for a public ngrok tunnel
+    demo.launch(share=False, server_name="0.0.0.0", server_port=7860)
