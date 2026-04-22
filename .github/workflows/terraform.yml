@@ -56,8 +56,9 @@ jobs:
         run: terraform destroy -auto-approve
 
 
+#### ---------------- Configuring Azure credentials for GitHub Actions
 
-# ----- 
+### ----- 
 # secrets.AZURE_SUBSCRIPTION_ID
 # secrets.AZURE_TENANT_ID
 
@@ -66,14 +67,29 @@ jobs:
 
 
 
-# ----- 
+### -----  service principal 
+# https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade
+
 # secrets.AZURE_CLIENT_ID
 
-# # Client ID (the service principal you want GitHub to use)
+## Client ID (the service principal you want GitHub to use)
 # az ad sp list --show-mine --query "[].{name:displayName, clientId:appId}" -o table
 # az ad sp list --all -o table
 
-# Create a client ID if needed
+## Create a client ID if needed
 # az ad sp create-for-rbac --name "postershack-github-actions" \
 #   --role contributor \
 #   --scopes /subscriptions/$(az account show --query id -o tsv)
+
+
+
+### ----- create federated credential for service princiapal (basically instead of setting a secret password)
+
+# az ad app federated-credential create \
+#   --id 9c82ca74-f79d-4386-8875-746dd1134bc6 \
+#   --parameters '{
+#     "name": "postershack-production",
+#     "issuer": "https://token.actions.githubusercontent.com",
+#     "subject": "repo:MatthewEngineering/postershack:environment:production",
+#     "audiences": ["api://AzureADTokenExchange"]
+#   }'
