@@ -30,6 +30,8 @@ resource "azurerm_container_app_environment" "env" {
 }
 
 # ── Container App ─────────────────────────────────────────────────────────────
+# Terraform owns infrastructure only: scaling rules and ingress config.
+# Image, registry auth, and env vars are managed by the CI/CD deploy action.
 
 resource "azurerm_container_app" "diffuser" {
   name                         = var.app_name
@@ -37,20 +39,7 @@ resource "azurerm_container_app" "diffuser" {
   resource_group_name          = azurerm_resource_group.postershack.name
   revision_mode                = "Single"
 
-  # GHCR auth — token supplied via TF_VAR_ghcr_token or terraform.tfvars
-  registry {
-    server               = "ghcr.io"
-    username             = var.ghcr_username
-    password_secret_name = "ghcr-token"
-  }
-
-  secret {
-    name  = "ghcr-token"
-    value = var.ghcr_token
-  }
-
   template {
-    # Scale to zero: 0 min replicas, wake on HTTP traffic
     min_replicas = 0
     max_replicas = var.max_replicas
 
@@ -59,24 +48,12 @@ resource "azurerm_container_app" "diffuser" {
       concurrent_requests = var.scale_out_concurrent_requests
     }
 
+    # Placeholder image — CI/CD deploy action overwrites this on first push.
     container {
       name   = var.app_name
-      image  = "ghcr.io/${var.ghcr_username}/${var.image_name}:${var.image_tag}"
-      cpu    = var.cpu
-      memory = var.memory
-
-      env {
-        name  = "GRADIO_SERVER_NAME"
-        value = "0.0.0.0"
-      }
-      env {
-        name  = "GRADIO_SERVER_PORT"
-        value = "7860"
-      }
-      env {
-        name  = "GRADIO_ANALYTICS_ENABLED"
-        value = "False"
-      }
+      image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+      cpu    = 1.0
+      memory = "2Gi"
     }
   }
 
