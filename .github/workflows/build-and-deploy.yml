@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - "app2/**"
-      - "!app2/terraform/**"
+      - "app3/**"
+      - "!app3/terraform/**"
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/diffuser-mvp
+  IMAGE_NAME: ${{ github.repository }}/postershack-api
 
 jobs:
   build-push:
@@ -48,7 +48,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: app2
+          context: app3
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -56,7 +56,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
-    name: Deploy to Azure Container Apps
+    name: Deploy to Azure Function App
     runs-on: ubuntu-latest
     needs: build-push
     environment: production
@@ -73,16 +73,12 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy new revision
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          resourceGroup: postershack-rg
-          containerAppName: diffuser-mvp
-          imageToDeploy: ghcr.io/matthewengineering/postershack/diffuser-mvp:${{ needs.build-push.outputs.image_tag }}
-          registryUrl: ${{ env.REGISTRY }}
-          registryUsername: ${{ github.actor }}
-          registryPassword: ${{ secrets.GITHUB_TOKEN }}
-          environmentVariables: >
-            GRADIO_SERVER_NAME=0.0.0.0
-            GRADIO_SERVER_PORT=7860
-            GRADIO_ANALYTICS_ENABLED=False
+      - name: Deploy image to Function App
+        run: |
+          az functionapp config container set \
+            --name diffuser-mvp \
+            --resource-group postershack-rg \
+            --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build-push.outputs.image_tag }} \
+            --registry-server ${{ env.REGISTRY }} \
+            --registry-username ${{ github.actor }} \
+            --registry-password ${{ secrets.GITHUB_TOKEN }}

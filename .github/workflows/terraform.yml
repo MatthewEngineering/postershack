@@ -4,7 +4,7 @@ on:
   # push:
   #   branches: [main]
   #   paths:
-  #     - "app2/terraform/**"
+  #     - "app3/terraform/**"
   workflow_dispatch:
     inputs:
       action:
@@ -13,10 +13,14 @@ on:
         default: plan
         type: choice
         options: [plan, apply, destroy]
+      image_tag:
+        description: "Docker image tag to deploy (e.g. a1b2c3d or latest)"
+        required: false
+        default: latest
 
 defaults:
   run:
-    working-directory: app2/terraform
+    working-directory: app3/terraform
 
 jobs:
   terraform:
@@ -45,7 +49,10 @@ jobs:
         run: terraform init
 
       - name: Terraform plan
-        run: terraform plan -out=tfplan
+        run: |
+          terraform plan -out=tfplan \
+            -var="image_name=ghcr.io/${{ github.repository }}/postershack-api" \
+            -var="image_tag=${{ inputs.image_tag || 'latest' }}"
 
       - name: Terraform apply
         if: ${{ inputs.action != 'plan' && (inputs.action == 'apply' || github.event_name == 'push') }}
@@ -53,7 +60,9 @@ jobs:
 
       - name: Terraform destroy
         if: ${{ inputs.action == 'destroy' }}
-        run: terraform destroy -auto-approve
+        run: terraform destroy -auto-approve \
+          -var="image_name=ghcr.io/${{ github.repository }}/postershack-api" \
+          -var="image_tag=${{ inputs.image_tag || 'latest' }}"
 
 
 #### ---------------- Configuring Azure credentials for GitHub Actions
