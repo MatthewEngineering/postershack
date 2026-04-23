@@ -1,4 +1,4 @@
 output "app_url" {
-  description = "Public HTTPS URL of the Function App"
-  value       = "https://${azurerm_linux_function_app.fn.default_hostname}"
+  description = "Public HTTPS URL of the Container App"
+  value       = "https://${azurerm_container_app.app.latest_revision_fqdn}"
 }

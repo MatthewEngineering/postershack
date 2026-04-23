@@ -36,3 +36,47 @@ push:
 # Open a shell inside the running container (for debugging)
 shell:
 	docker exec -it $(IMAGE) /bin/bash
+
+
+# -- terraform -──────────────────────────────────────────────────────────────────────
+
+TF_DIR    := terraform
+# Load HF_TOKEN from .env so it doesn't need to be typed each time
+include .env
+export HF_TOKEN
+TF_VARS   := -var="hf_token=$(HF_TOKEN)"
+
+tf-init:
+	terraform -chdir=$(TF_DIR) init
+
+tf-plan:
+	terraform -chdir=$(TF_DIR) plan $(TF_VARS)
+
+tf-apply:
+	terraform -chdir=$(TF_DIR) apply -auto-approve $(TF_VARS)
+
+tf-destroy:
+	terraform -chdir=$(TF_DIR) destroy -auto-approve $(TF_VARS)
+
+tf-output:
+	terraform -chdir=$(TF_DIR) output
+
+# ── Help ──────────────────────────────────────────────────────────────────────
+
+help:
+	@echo ""
+	@echo "Docker:"
+	@echo "  make build          Build the image (IMAGE=name TAG=tag)"
+	@echo "  make run            Run locally at http://localhost:7860"
+	@echo "  make stop           Stop and remove the container"
+	@echo "  make logs           Tail container logs"
+	@echo "  make push           Push image to registry"
+	@echo "  make shell          Open bash inside running container"
+	@echo ""
+	@echo "Terraform:"
+	@echo "  make tf-init        terraform init"
+	@echo "  make tf-plan        terraform plan  (HF_TOKEN loaded from .env)"
+	@echo "  make tf-apply       terraform apply (HF_TOKEN loaded from .env)"
+	@echo "  make tf-destroy     terraform destroy"
+	@echo "  make tf-output      Show terraform outputs"
+	@echo ""

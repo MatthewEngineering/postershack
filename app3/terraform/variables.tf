@@ -13,28 +13,23 @@ variable "resource_group_name" {
 variable "app_name" {
   description = "Container App name"
   type        = string
-  default     = "diffuser-mvp"
+  default     = "postershack-app3"
 }
 
-variable "storage_account_name" {
-  description = "Storage account name required by the Function App (3-24 lowercase alphanumeric)"
-  type        = string
-  default     = "postershackfnstore"
+variable "max_replicas" {
+  description = "Maximum replicas to scale out to"
+  type        = number
+  default     = 1
 }
 
-variable "sku_name" {
-  description = "App Service Plan SKU (e.g. Y1 for Consumption, EP1/EP2/EP3 for Elastic Premium, P1v3 for Premium v3)"
-  type        = string
-  default     = "EP1"
+variable "scale_out_concurrent_requests" {
+  description = "Concurrent HTTP requests per replica before ACA adds another replica"
+  type        = number
+  default     = 10
 }
 
-variable "image_name" {
-  description = "Full Docker image name, e.g. ghcr.io/org/postershack-api"
+variable "hf_token" {
+  description = "HuggingFace API token"
   type        = string
-}
-
-variable "image_tag" {
-  description = "Docker image tag to deploy, e.g. a1b2c3d or latest"
-  type        = string
-  default     = "latest"
+  sensitive   = true
 }

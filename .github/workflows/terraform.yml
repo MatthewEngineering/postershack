@@ -13,10 +13,6 @@ on:
         default: plan
         type: choice
         options: [plan, apply, destroy]
-      image_tag:
-        description: "Docker image tag to deploy (e.g. a1b2c3d or latest)"
-        required: false
-        default: latest
 
 defaults:
   run:
@@ -49,10 +45,7 @@ jobs:
         run: terraform init
 
       - name: Terraform plan
-        run: |
-          terraform plan -out=tfplan \
-            -var="image_name=ghcr.io/${{ github.repository }}/postershack-api" \
-            -var="image_tag=${{ inputs.image_tag || 'latest' }}"
+        run: terraform plan -out=tfplan
 
       - name: Terraform apply
         if: ${{ inputs.action != 'plan' && (inputs.action == 'apply' || github.event_name == 'push') }}
@@ -60,9 +53,7 @@ jobs:
 
       - name: Terraform destroy
         if: ${{ inputs.action == 'destroy' }}
-        run: terraform destroy -auto-approve \
-          -var="image_name=ghcr.io/${{ github.repository }}/postershack-api" \
-          -var="image_tag=${{ inputs.image_tag || 'latest' }}"
+        run: terraform destroy -auto-approve
 
 
 #### ---------------- Configuring Azure credentials for GitHub Actions
