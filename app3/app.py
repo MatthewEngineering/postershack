@@ -18,7 +18,7 @@ def generate_image(prompt: str) -> object:
         model="black-forest-labs/FLUX.1-schnell",
     )
 
-with gr.Blocks(title="Postershack — Image Generator", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="Postershack — Image Generator", theme=gr.themes.Soft(), css="footer { display: none !important; }") as demo:
     gr.Markdown("# Postershack Image Generator")
 
     with gr.Tabs():
