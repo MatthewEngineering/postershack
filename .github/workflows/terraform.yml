@@ -43,17 +43,25 @@ jobs:
 
       - name: Terraform init
         run: terraform init
+        env:
+          TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
       - name: Terraform plan
         run: terraform plan -out=tfplan
+        env:
+          TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
       - name: Terraform apply
         if: ${{ inputs.action != 'plan' && (inputs.action == 'apply' || github.event_name == 'push') }}
         run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
       - name: Terraform destroy
         if: ${{ inputs.action == 'destroy' }}
         run: terraform destroy -auto-approve
+        env:
+          TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
 
 #### ---------------- Configuring Azure credentials for GitHub Actions
