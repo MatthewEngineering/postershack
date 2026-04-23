@@ -21,6 +21,29 @@ resource "azurerm_resource_group" "postershack" {
   location = var.location
 }
 
+# ── Storage Account (LRS / Cool — cheapest persistent blob) ──────────────────
+
+resource "azurerm_storage_account" "images" {
+  name                     = var.storage_account_name
+  resource_group_name      = azurerm_resource_group.postershack.name
+  location                 = azurerm_resource_group.postershack.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  access_tier              = "Cool"
+
+  blob_properties {
+    delete_retention_policy {
+      days = 7
+    }
+  }
+}
+
+resource "azurerm_storage_container" "images" {
+  name                  = "generated-images"
+  storage_account_name  = azurerm_storage_account.images.name
+  container_access_type = "private"
+}
+
 # ── Container Apps Environment ────────────────────────────────────────────────
 
 resource "azurerm_container_app_environment" "env" {
@@ -45,6 +68,11 @@ resource "azurerm_container_app" "app" {
     value = var.hf_token
   }
 
+  secret {
+    name  = "storage-connection-string"
+    value = azurerm_storage_account.images.primary_connection_string
+  }
+
   template {
     min_replicas = 0
     max_replicas = var.max_replicas
@@ -63,6 +91,16 @@ resource "azurerm_container_app" "app" {
       env {
         name        = "HF_TOKEN"
         secret_name = "hf-token"
+      }
+
+      env {
+        name        = "AZURE_STORAGE_CONNECTION_STRING"
+        secret_name = "storage-connection-string"
+      }
+
+      env {
+        name  = "STORAGE_MODE"
+        value = "azure"
       }
     }
   }

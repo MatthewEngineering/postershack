@@ -33,3 +33,9 @@ variable "hf_token" {
   type        = string
   sensitive   = true
 }
+
+variable "storage_account_name" {
+  description = "Globally unique name for the Azure Storage Account (3-24 lowercase alphanumeric)"
+  type        = string
+  default     = "postershackimages"
+}

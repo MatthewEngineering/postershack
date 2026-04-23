@@ -8,6 +8,9 @@ comfyui/output/
 
 .vscode/settings.json
 
+# app3
+*/tmp
+
 # Terraform
 *.tfvars
 *.tfvars.json
