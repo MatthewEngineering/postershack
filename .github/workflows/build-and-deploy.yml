@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/postershack-api
+  IMAGE_NAME: matthewengineering/postershack/postershack-api  # ${{ github.repository_owner }}/postershack-api
 
 jobs:
   build-push:
@@ -73,7 +73,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Upsert Container App secrets
+      - name: Upsert Container App secrets from github secrets
         run: |
           az containerapp secret set \
             --name postershack-app3 \
