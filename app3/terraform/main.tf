@@ -78,3 +78,25 @@ resource "azurerm_container_app" "app" {
     }
   }
 }
+
+# ── Custom Domain ─────────────────────────────────────────────────────────────
+# DNS records required in Spaceship before applying:
+#   CNAME  postershack-api          → <app_fqdn output>
+#   TXT    asuid.postershack-api    → <custom_domain_verification_id output>
+
+resource "azurerm_container_app_custom_domain" "api" {
+  name             = "postershackapi.matthewengineering.com"
+  container_app_id = azurerm_container_app.app.id
+
+  # certificate_binding_type and certificate_id are omitted so ACA provisions
+  # and auto-renews a managed TLS cert after DNS verification passes.
+}
+
+
+# Necessary command to bind the custom domain after Terraform applies the ACA and outputs the verification ID:
+# az containerapp hostname bind \
+#   --name postershack-app3 \
+#   --resource-group postershack-rg \
+#   --hostname postershackapi.matthewengineering.com \
+#   --environment postershack-app3-env \
+#   --validation-method CNAME
