@@ -1,0 +1,7 @@
+config:
+  gcp:project: matthewengineeringgcp
+  gcp:region: us-central1
+  postershack-app3:app_name: postershack-app3
+  postershack-app3:max_instances: "1"
+  postershack-app3:hf_token:
+    secure: REPLACE_WITH_PULUMI_SECRET

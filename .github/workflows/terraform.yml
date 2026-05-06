@@ -20,7 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     permissions:
-      id-token: write
       contents: read
 
     steps:
@@ -33,8 +32,7 @@ jobs:
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SA_EMAIL }}
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
       - name: Terraform init
         run: terraform init
@@ -42,43 +40,39 @@ jobs:
       - name: Terraform plan
         run: terraform plan -out=tfplan
         env:
-          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          TF_VAR_ghcr_pat: ${{ secrets.GHCR_PAT }}
           TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
       - name: Terraform apply
         if: ${{ inputs.action == 'apply' }}
         run: terraform apply -auto-approve tfplan
         env:
-          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          TF_VAR_ghcr_pat: ${{ secrets.GHCR_PAT }}
           TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
       - name: Terraform destroy
         if: ${{ inputs.action == 'destroy' }}
         run: terraform destroy -auto-approve
         env:
-          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          TF_VAR_ghcr_pat: ${{ secrets.GHCR_PAT }}
           TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
 
-#### ── Bootstrap: first-time GCP setup ────────────────────────────────────────
+#### ── One-time bootstrap ──────────────────────────────────────────────────────
 #
-# Workload Identity doesn't exist yet on first apply, so run Terraform locally:
+# Create a service account key and add it to GitHub secrets as GCP_CREDENTIALS:
 #
-#   gcloud auth application-default login
-#   cd app3/terraform
-#   terraform init
-#   terraform apply \
-#     -var="project_id=YOUR_PROJECT" \
-#     -var="ghcr_pat=YOUR_PAT" \
-#     -var="hf_token=YOUR_HF_TOKEN"
+#   gcloud iam service-accounts create postershack-ci \
+#     --project=postershack \
+#     --display-name="CI/CD service account"
 #
-# Then set these GitHub secrets from the terraform outputs:
-#   GCP_PROJECT_ID                — your GCP project ID
-#   GCP_WORKLOAD_IDENTITY_PROVIDER — terraform output workload_identity_provider
-#   GCP_SA_EMAIL                  — terraform output github_actions_sa_email
-#   GCP_AR_PROXY_BASE_URL         — terraform output ar_proxy_base_url
-#   GHCR_PAT                      — GitHub PAT with read:packages
-#   HF_TOKEN                      — HuggingFace token
+#   gcloud projects add-iam-policy-binding postershack \
+#     --member="serviceAccount:postershack-ci@postershack.iam.gserviceaccount.com" \
+#     --role="roles/owner"
+#
+#   gcloud iam service-accounts keys create key.json \
+#     --iam-account=postershack-ci@postershack.iam.gserviceaccount.com
+#
+#   # Paste the contents of key.json as the GCP_CREDENTIALS GitHub secret,
+#   # then delete the local file: rm key.json
+#
+# After first terraform apply, also set:
+#   GCP_AR_IMAGE_BASE  — terraform output ar_image_base
+#   HF_TOKEN           — your HuggingFace token

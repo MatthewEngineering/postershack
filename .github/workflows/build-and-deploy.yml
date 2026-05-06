@@ -6,6 +6,7 @@ on:
     paths:
       - "app3/**"
       - "!app3/terraform/**"
+      - "!app3/IaC/**"
   workflow_dispatch:
 
 env:
@@ -18,10 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
 
     outputs:
-      image: ${{ steps.build.outputs.image }}
+      image: ${{ steps.image.outputs.ref }}
 
     steps:
       - uses: actions/checkout@v4
@@ -29,8 +29,7 @@ jobs:
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SA_EMAIL }}
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
@@ -39,7 +38,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push
-        id: build
         uses: docker/build-push-action@v6
         with:
           context: app3
@@ -50,8 +48,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Export image ref
-        run: echo "image=${{ secrets.GCP_AR_IMAGE_BASE }}:${{ github.sha }}" >> $GITHUB_OUTPUT
+      - name: Set image output
+        id: image
+        run: echo "ref=${{ secrets.GCP_AR_IMAGE_BASE }}:${{ github.sha }}" >> $GITHUB_OUTPUT
 
   deploy:
     name: Deploy to Cloud Run
@@ -59,15 +58,13 @@ jobs:
     needs: build-push
     environment: production
     permissions:
-      id-token: write
       contents: read
 
     steps:
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SA_EMAIL }}
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2

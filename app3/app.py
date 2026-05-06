@@ -36,6 +36,7 @@ def save_image(image, prompt: str):
     METADATA_FILE.write_text(json.dumps(records))
 
 
+# TODO: modify this to be from the gcp bucket if STORAGE_MODE=gcp instead of STORAGE_MODE=local
 def load_gallery() -> list:
     images = []
     for r in load_metadata()[:20]:
