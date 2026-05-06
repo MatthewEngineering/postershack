@@ -14,7 +14,7 @@ build:
 # Run locally — mounts a model cache so re-runs don't re-download weights
 run:
 	docker run -d \
-		--name $(IMAGE) \
+		--name $(IMAGE)1 \
 		-p 7860:7860 \
 		--env-file .env \
 		$(IMAGE):$(TAG)
