@@ -1,11 +1,10 @@
 terraform {
   required_version = ">= 1.5"
 
-  # After first apply, uncomment this block and run: terraform init -migrate-state
-  # backend "gcs" {
-  #   bucket = "postershack-tfstate"
-  #   prefix = "app3/terraform/state"
-  # }
+  backend "gcs" {
+    bucket = "terraform-state-matthewengineering"
+    prefix = "postershack/app3/terraform-state"
+  }
 
   required_providers {
     google = {
@@ -16,14 +15,19 @@ terraform {
 }
 
 locals {
-  project_id = "postershack"
-  region     = "us-central1"
+  project_id     = "postershack"
+  region         = "us-central1"
+  ar_repo        = "postershack"
+  image_name     = "postershack-api"
+  ar_image_base  = "${local.region}-docker.pkg.dev/${local.project_id}/${local.ar_repo}/${local.image_name}"
 }
 
 provider "google" {
   project = local.project_id
   region  = local.region
 }
+
+data "google_project" "project" {}
 
 # ── APIs ──────────────────────────────────────────────────────────────────────
 
@@ -42,21 +46,12 @@ resource "google_project_service" "apis" {
 
 resource "google_artifact_registry_repository" "images" {
   location      = local.region
-  repository_id = "postershack"
+  repository_id = local.ar_repo
   format        = "DOCKER"
   depends_on    = [google_project_service.apis]
 }
 
 # ── GCS bucket ────────────────────────────────────────────────────────────────
-
-resource "google_storage_bucket" "tfstate" {
-  name          = "postershack-tfstate"
-  location      = local.region
-  force_destroy = false
-
-  uniform_bucket_level_access = true
-  versioning { enabled = true }
-}
 
 resource "google_storage_bucket" "images" {
   name          = "${local.project_id}-images"
@@ -71,7 +66,7 @@ resource "google_storage_bucket" "images" {
   }
 }
 
-# ── Secrets ───────────────────────────────────────────────────────────────────
+# ── Secret + access for Cloud Run runtime SA ──────────────────────────────────
 
 resource "google_secret_manager_secret" "hf_token" {
   secret_id  = "hf-token"
@@ -86,6 +81,12 @@ resource "google_secret_manager_secret_version" "hf_token" {
   secret_data = var.hf_token
 }
 
+resource "google_secret_manager_secret_iam_member" "hf_token_accessor" {
+  secret_id = google_secret_manager_secret.hf_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+}
+
 # ── Cloud Run service ─────────────────────────────────────────────────────────
 
 resource "google_cloud_run_v2_service" "app" {
@@ -93,10 +94,12 @@ resource "google_cloud_run_v2_service" "app" {
   location            = local.region
   ingress             = "INGRESS_TRAFFIC_ALL"
   deletion_protection = false
-  depends_on          = [google_project_service.apis]
+  depends_on = [
+    google_project_service.apis,
+    google_secret_manager_secret_iam_member.hf_token_accessor,
+  ]
 
   template {
-
     scaling {
       min_instance_count = 0
       max_instance_count = var.max_instances
@@ -111,30 +114,21 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       env {
-        name  = "PORT"
-        value = "7860"
-      }
-
-      env {
         name  = "GRADIO_SERVER_NAME"
         value = "0.0.0.0"
       }
-
       env {
         name  = "GRADIO_SERVER_PORT"
         value = "7860"
       }
-
       env {
         name  = "STORAGE_MODE"
         value = "gcs"
       }
-
       env {
         name  = "GCS_BUCKET_NAME"
         value = google_storage_bucket.images.name
       }
-
       env {
         name = "HF_TOKEN"
         value_source {
@@ -152,6 +146,15 @@ resource "google_cloud_run_v2_service" "app" {
         }
       }
     }
+  }
+
+  # CI/CD owns the image tag — don't let `terraform apply` revert it.
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+      client,
+      client_version,
+    ]
   }
 }
 

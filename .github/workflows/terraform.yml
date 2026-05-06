@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "plan or apply"
+        description: "plan, apply, or destroy"
         required: true
         default: plan
         type: choice
@@ -22,6 +22,9 @@ jobs:
     permissions:
       contents: read
 
+    env:
+      TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -34,45 +37,16 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
-      - name: Terraform init
-        run: terraform init
+      - run: terraform init
 
       - name: Terraform plan
-        run: terraform plan -out=tfplan
-        env:
-          TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
+        if: inputs.action == 'plan'
+        run: terraform plan
 
       - name: Terraform apply
-        if: ${{ inputs.action == 'apply' }}
-        run: terraform apply -auto-approve tfplan
-        env:
-          TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
+        if: inputs.action == 'apply'
+        run: terraform apply -auto-approve
 
       - name: Terraform destroy
-        if: ${{ inputs.action == 'destroy' }}
+        if: inputs.action == 'destroy'
         run: terraform destroy -auto-approve
-        env:
-          TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
-
-
-#### ── One-time bootstrap ──────────────────────────────────────────────────────
-#
-# Create a service account key and add it to GitHub secrets as GCP_CREDENTIALS:
-#
-#   gcloud iam service-accounts create postershack-ci \
-#     --project=postershack \
-#     --display-name="CI/CD service account"
-#
-#   gcloud projects add-iam-policy-binding postershack \
-#     --member="serviceAccount:postershack-ci@postershack.iam.gserviceaccount.com" \
-#     --role="roles/owner"
-#
-#   gcloud iam service-accounts keys create key.json \
-#     --iam-account=postershack-ci@postershack.iam.gserviceaccount.com
-#
-#   # Paste the contents of key.json as the GCP_CREDENTIALS GitHub secret,
-#   # then delete the local file: rm key.json
-#
-# After first terraform apply, also set:
-#   GCP_AR_IMAGE_BASE  — terraform output ar_image_base
-#   HF_TOKEN           — your HuggingFace token

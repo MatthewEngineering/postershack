@@ -1,9 +1,0 @@
-name: postershack-app3
-description: GCP infrastructure for Postershack app3 (Cloud Run, Artifact Registry, GCS, Secret Manager)
-runtime:
-  name: python
-  options:
-    virtualenv: venv
-config:
-  gcp:project: matthewengineeringgcp
-  gcp:region: us-central1
