@@ -89,10 +89,11 @@ resource "google_secret_manager_secret_version" "hf_token" {
 # ── Cloud Run service ─────────────────────────────────────────────────────────
 
 resource "google_cloud_run_v2_service" "app" {
-  name       = var.app_name
-  location   = local.region
-  ingress    = "INGRESS_TRAFFIC_ALL"
-  depends_on = [google_project_service.apis]
+  name                = var.app_name
+  location            = local.region
+  ingress             = "INGRESS_TRAFFIC_ALL"
+  deletion_protection = false
+  depends_on          = [google_project_service.apis]
 
   template {
 
@@ -107,6 +108,11 @@ resource "google_cloud_run_v2_service" "app" {
 
       ports {
         container_port = 7860
+      }
+
+      env {
+        name  = "PORT"
+        value = "7860"
       }
 
       env {
