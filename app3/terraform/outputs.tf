@@ -22,3 +22,14 @@ output "github_actions_sa_email" {
   description = "GitHub Actions service account email — set as GCP_SA_EMAIL secret in GitHub"
   value       = google_service_account.github_actions.email
 }
+
+output "app_fqdn" {
+  description = "Bare FQDN to use as the CNAME target in Spaceship"
+  value       = azurerm_container_app.app.latest_revision_fqdn
+}
+
+output "custom_domain_verification_id" {
+  description = "Value for the TXT record: asuid.postershack-api.matthewengineering.com"
+  value       = azurerm_container_app.app.custom_domain_verification_id
+  sensitive = true
+}
