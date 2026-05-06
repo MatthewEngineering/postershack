@@ -2,27 +2,70 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import uuid
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
 import gradio as gr
 from huggingface_hub import InferenceClient
+from PIL import Image
+
+LOCAL_DIR = Path("tmp")
+METADATA_FILE = LOCAL_DIR / "metadata.json"
 
 client = InferenceClient(
     provider="nscale",
     api_key=os.environ["HF_TOKEN"],
 )
 
-def generate_image(prompt: str) -> object:
+
+def load_metadata() -> list:
+    try:
+        return json.loads(METADATA_FILE.read_text())
+    except Exception:
+        return []
+
+
+def save_image(image, prompt: str):
+    LOCAL_DIR.mkdir(exist_ok=True)
+    name = f"{uuid.uuid4()}.png"
+    image.save(LOCAL_DIR / name, format="PNG")
+    records = load_metadata()
+    records.insert(0, {"file": name, "prompt": prompt, "ts": datetime.now(timezone.utc).isoformat()})
+    METADATA_FILE.write_text(json.dumps(records))
+
+
+def load_gallery() -> list:
+    images = []
+    for r in load_metadata()[:20]:
+        try:
+            images.append((Image.open(LOCAL_DIR / r["file"]), r["prompt"]))
+        except Exception:
+            continue
+    return images
+
+
+def generate_image(prompt: str):
     if not prompt.strip():
         return None
-    return client.text_to_image(
-        prompt,
-        model="black-forest-labs/FLUX.1-schnell",
-    )
+    image = client.text_to_image(prompt, model="black-forest-labs/FLUX.1-schnell")
+    save_image(image, prompt)
+    return image
+
 
 with gr.Blocks(title="Postershack — Image Generator", theme=gr.themes.Soft(), css="footer { display: none !important; }") as demo:
     gr.Markdown("# Postershack Image Generator")
 
     with gr.Tabs():
-        with gr.Tab("Generate"):
+
+        with gr.TabItem("Gallery"):
+            refresh_btn = gr.Button("Refresh", variant="secondary")
+            gallery = gr.Gallery(label="Previously generated images", columns=3, object_fit="cover", height="auto")
+            refresh_btn.click(fn=load_gallery, inputs=[], outputs=gallery)
+
+
+        with gr.TabItem("Generate"):
             gr.Markdown(
                 "Designed using FLUX.1-schnell via HuggingFace Inference &nbsp;|&nbsp; "
                 "[Model](https://huggingface.co/black-forest-labs/FLUX.1-schnell)"
@@ -73,18 +116,19 @@ with gr.Blocks(title="Postershack — Image Generator", theme=gr.themes.Soft(), 
                 ["Glowing Forest",   "A dark forest path with glowing mushrooms and fireflies, fantasy mood"],
             ]
 
-            title_col = gr.Textbox(visible=False)
+            title_col = gr.Textbox() # visible=False)
             gr.Markdown("### Example prompts")
             gr.Examples(examples=EXAMPLES, inputs=[title_col, prompt])
 
             generate_btn.click(fn=generate_image, inputs=prompt, outputs=output)
             prompt.submit(fn=generate_image, inputs=prompt, outputs=output)
 
-        with gr.Tab("Settings"):
+
+        with gr.TabItem("Settings"):
             gr.Markdown(
                 "## Billing\n"
                 "[View HuggingFace Billing](https://huggingface.co/settings/billing)"
             )
 
 if __name__ == "__main__":
-    demo.launch(mcp_server=True)
+    demo.launch()

@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
 
-# Gradio listens on 7860; Azure Container Apps routes to this port
+# Gradio listens on 7860; Cloud Run routes to this port
 EXPOSE 7860
 
 # Gradio must bind to 0.0.0.0 inside a container

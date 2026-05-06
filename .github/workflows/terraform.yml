@@ -1,10 +1,6 @@
 name: Terraform
 
 on:
-  # push:
-  #   branches: [main]
-  #   paths:
-  #     - "app3/terraform/**"
   workflow_dispatch:
     inputs:
       action:
@@ -20,7 +16,7 @@ defaults:
 
 jobs:
   terraform:
-    name: Terraform ${{ inputs.action || 'apply' }}
+    name: Terraform ${{ inputs.action }}
     runs-on: ubuntu-latest
     environment: production
     permissions:
@@ -34,70 +30,55 @@ jobs:
         with:
           terraform_version: "~1.5"
 
-      - name: Azure login
-        uses: azure/login@v2
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
 
       - name: Terraform init
         run: terraform init
-        env:
-          TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
       - name: Terraform plan
         run: terraform plan -out=tfplan
         env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_ghcr_pat: ${{ secrets.GHCR_PAT }}
           TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
       - name: Terraform apply
-        if: ${{ inputs.action != 'plan' && (inputs.action == 'apply' || github.event_name == 'push') }}
+        if: ${{ inputs.action == 'apply' }}
         run: terraform apply -auto-approve tfplan
         env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_ghcr_pat: ${{ secrets.GHCR_PAT }}
           TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
       - name: Terraform destroy
         if: ${{ inputs.action == 'destroy' }}
         run: terraform destroy -auto-approve
         env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_ghcr_pat: ${{ secrets.GHCR_PAT }}
           TF_VAR_hf_token: ${{ secrets.HF_TOKEN }}
 
 
-#### ---------------- Configuring Azure credentials for GitHub Actions
-
-### ----- gather tenant and subscription IDs (from your current login)
-# secrets.AZURE_SUBSCRIPTION_ID
-# secrets.AZURE_TENANT_ID
-
-# # Tenant and Subscription IDs (from your current login)
-# az account show --query "{subscriptionId:id, tenantId:tenantId}" -o table
-
-
-
-### ----- create service principal (basically the identity that GitHub Actions will use to authenticate with Azure)
-# https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade
-
-# secrets.AZURE_CLIENT_ID
-
-## Client ID (the service principal you want GitHub to use)
-# az ad sp list --show-mine --query "[].{name:displayName, clientId:appId}" -o table
-# az ad sp list --all -o table
-
-## Create a client ID if needed
-# az ad sp create-for-rbac --name "postershack-github-actions" \
-#   --role contributor \
-#   --scopes /subscriptions/$(az account show --query id -o tsv)
-
-
-
-### ----- create federated credential for service princiapal (basically instead of setting a secret password)
-
-# az ad app federated-credential create \
-#   --id 9c82ca74-f79d-4386-8875-746dd1134bc6 \
-#   --parameters '{
-#     "name": "postershack-production",
-#     "issuer": "https://token.actions.githubusercontent.com",
-#     "subject": "repo:MatthewEngineering/postershack:environment:production",
-#     "audiences": ["api://AzureADTokenExchange"]
-#   }'
+#### ── Bootstrap: first-time GCP setup ────────────────────────────────────────
+#
+# Workload Identity doesn't exist yet on first apply, so run Terraform locally:
+#
+#   gcloud auth application-default login
+#   cd app3/terraform
+#   terraform init
+#   terraform apply \
+#     -var="project_id=YOUR_PROJECT" \
+#     -var="ghcr_pat=YOUR_PAT" \
+#     -var="hf_token=YOUR_HF_TOKEN"
+#
+# Then set these GitHub secrets from the terraform outputs:
+#   GCP_PROJECT_ID                — your GCP project ID
+#   GCP_WORKLOAD_IDENTITY_PROVIDER — terraform output workload_identity_provider
+#   GCP_SA_EMAIL                  — terraform output github_actions_sa_email
+#   GCP_AR_PROXY_BASE_URL         — terraform output ar_proxy_base_url
+#   GHCR_PAT                      — GitHub PAT with read:packages
+#   HF_TOKEN                      — HuggingFace token

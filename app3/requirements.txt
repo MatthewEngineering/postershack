@@ -2,3 +2,4 @@ gradio
 huggingface_hub
 python-dotenv
 Pillow
+azure-storage-blob

@@ -14,9 +14,8 @@ build:
 # Run locally — mounts a model cache so re-runs don't re-download weights
 run:
 	docker run -d \
-		--name $(IMAGE) \
+		--name $(IMAGE)1 \
 		-p 7860:7860 \
-		-v diffuser-model-cache:/root/.cache/huggingface \
 		--env-file .env \
 		$(IMAGE):$(TAG)
 	@echo "Running at http://localhost:7860"
@@ -41,9 +40,10 @@ shell:
 # -- terraform -──────────────────────────────────────────────────────────────────────
 
 TF_DIR    := terraform
-# Load HF_TOKEN from .env so it doesn't need to be typed each time
+# Load secrets from .env so they don't need to be typed each time
 include .env
 export HF_TOKEN
+export AZURE_STORAGE_CONNECTION_STRING
 TF_VARS   := -var="hf_token=$(HF_TOKEN)"
 
 tf-init:
