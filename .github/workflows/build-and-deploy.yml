@@ -9,8 +9,6 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/postershack/postershack-api
   GCP_REGION: us-central1
   CLOUD_RUN_SERVICE: postershack-app3
 
@@ -20,42 +18,40 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      id-token: write
 
     outputs:
-      image_tag: ${{ steps.meta.outputs.version }}
+      image: ${{ steps.build.outputs.image }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,prefix=,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: app3
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ secrets.GCP_AR_IMAGE_BASE }}:${{ github.sha }}
+            ${{ secrets.GCP_AR_IMAGE_BASE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Export image ref
+        run: echo "image=${{ secrets.GCP_AR_IMAGE_BASE }}:${{ github.sha }}" >> $GITHUB_OUTPUT
 
   deploy:
     name: Deploy to Cloud Run
@@ -78,5 +74,4 @@ jobs:
         with:
           service: ${{ env.CLOUD_RUN_SERVICE }}
           region: ${{ env.GCP_REGION }}
-          # AR proxy URL translates the GHCR image for Cloud Run
-          image: ${{ secrets.GCP_AR_PROXY_BASE_URL }}/${{ env.IMAGE_NAME }}:${{ needs.build-push.outputs.image_tag }}
+          image: ${{ needs.build-push.outputs.image }}

@@ -14,33 +14,15 @@ provider "google" {
   region  = var.region
 }
 
-# ── Artifact Registry: GHCR remote proxy ──────────────────────────────────────
-# Cloud Run can only pull from Artifact Registry. This remote repo proxies GHCR
-# so you keep pushing to GHCR and GCP fetches through here automatically.
+# ── Artifact Registry ─────────────────────────────────────────────────────────
 
-resource "google_artifact_registry_repository" "ghcr_proxy" {
+resource "google_artifact_registry_repository" "images" {
   location      = var.region
-  repository_id = "ghcr-proxy"
+  repository_id = "postershack"
   format        = "DOCKER"
-  mode          = "REMOTE_REPOSITORY"
-
-  remote_repository_config {
-    docker_repository {
-      custom_repository {
-        uri = "https://ghcr.io"
-      }
-    }
-
-    upstream_credentials {
-      username_password_credentials {
-        username                = var.ghcr_username
-        password_secret_version = google_secret_manager_secret_version.ghcr_pat.id
-      }
-    }
-  }
 }
 
-# ── GCS bucket (replaces Azure Blob Storage) ──────────────────────────────────
+# ── GCS bucket ────────────────────────────────────────────────────────────────
 
 resource "google_storage_bucket" "images" {
   name          = "${var.project_id}-postershack-images"
@@ -56,18 +38,6 @@ resource "google_storage_bucket" "images" {
 }
 
 # ── Secrets ───────────────────────────────────────────────────────────────────
-
-resource "google_secret_manager_secret" "ghcr_pat" {
-  secret_id = "ghcr-pat"
-  replication {
-    auto {}
-  }
-}
-
-resource "google_secret_manager_secret_version" "ghcr_pat" {
-  secret      = google_secret_manager_secret.ghcr_pat.id
-  secret_data = var.ghcr_pat
-}
 
 resource "google_secret_manager_secret" "hf_token" {
   secret_id = "hf-token"
@@ -96,8 +66,8 @@ resource "google_service_account" "github_actions" {
 # ── IAM: Cloud Run SA ─────────────────────────────────────────────────────────
 
 resource "google_artifact_registry_repository_iam_member" "cloud_run_reader" {
-  repository = google_artifact_registry_repository.ghcr_proxy.name
-  location   = google_artifact_registry_repository.ghcr_proxy.location
+  repository = google_artifact_registry_repository.images.name
+  location   = google_artifact_registry_repository.images.location
   role       = "roles/artifactregistry.reader"
   member     = "serviceAccount:${google_service_account.cloud_run.email}"
 }
@@ -150,6 +120,13 @@ resource "google_project_iam_member" "github_run_developer" {
   member  = "serviceAccount:${google_service_account.github_actions.email}"
 }
 
+resource "google_artifact_registry_repository_iam_member" "github_ar_writer" {
+  repository = google_artifact_registry_repository.images.name
+  location   = google_artifact_registry_repository.images.location
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${google_service_account.github_actions.email}"
+}
+
 # GitHub Actions needs to act as the Cloud Run SA when deploying.
 resource "google_service_account_iam_member" "github_act_as_cr" {
   service_account_id = google_service_account.cloud_run.name
@@ -158,8 +135,6 @@ resource "google_service_account_iam_member" "github_act_as_cr" {
 }
 
 # ── Cloud Run service ─────────────────────────────────────────────────────────
-# Terraform owns infrastructure: scaling, ingress, env wiring, service account.
-# Image tag is updated by the CI/CD deploy action on each push.
 
 resource "google_cloud_run_v2_service" "app" {
   name     = var.app_name
@@ -176,7 +151,7 @@ resource "google_cloud_run_v2_service" "app" {
 
     containers {
       # Placeholder — CI/CD overwrites the tag on first push.
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/ghcr-proxy/matthewengineering/postershack/postershack-api:latest"
+      image = "${var.region}-docker.pkg.dev/${var.project_id}/postershack/app3:latest"
 
       ports {
         container_port = 7860
