@@ -11,7 +11,8 @@ on:
 
 env:
   GCP_REGION: us-central1
-  CLOUD_RUN_SERVICE: postershack-app3
+  GCP_IMAGE_BASE: us-central1-docker.pkg.dev/postershack/api
+  CLOUD_RUN_SERVICE: postershack-api
 
 jobs:
   build-push:
@@ -42,15 +43,16 @@ jobs:
         with:
           context: app3
           push: true
+          platforms: linux/amd64
           tags: |
-            ${{ secrets.GCP_AR_IMAGE_BASE }}:${{ github.sha }}
-            ${{ secrets.GCP_AR_IMAGE_BASE }}:latest
+            ${{ env.GCP_IMAGE_BASE }}:${{ github.sha }}
+            ${{ env.GCP_IMAGE_BASE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Set image output
         id: image
-        run: echo "ref=${{ secrets.GCP_AR_IMAGE_BASE }}:${{ github.sha }}" >> $GITHUB_OUTPUT
+        run: echo "ref=${{ env.GCP_IMAGE_BASE }}:${{ github.sha }}" >> $GITHUB_OUTPUT
 
   deploy:
     name: Deploy to Cloud Run

@@ -1,6 +1,12 @@
 terraform {
   required_version = ">= 1.5"
 
+  # After first apply, uncomment this block and run: terraform init -migrate-state
+  # backend "gcs" {
+  #   bucket = "postershack-tfstate"
+  #   prefix = "app3/terraform/state"
+  # }
+
   required_providers {
     google = {
       source  = "hashicorp/google"
@@ -9,24 +15,52 @@ terraform {
   }
 }
 
+locals {
+  project_id = "postershack"
+  region     = "us-central1"
+}
+
 provider "google" {
-  project = var.project_id
-  region  = var.region
+  project = local.project_id
+  region  = local.region
+}
+
+# ── APIs ──────────────────────────────────────────────────────────────────────
+
+resource "google_project_service" "apis" {
+  for_each = toset([
+    "artifactregistry.googleapis.com",
+    "run.googleapis.com",
+    "secretmanager.googleapis.com",
+    "storage.googleapis.com",
+  ])
+  service            = each.key
+  disable_on_destroy = false
 }
 
 # ── Artifact Registry ─────────────────────────────────────────────────────────
 
 resource "google_artifact_registry_repository" "images" {
-  location      = var.region
+  location      = local.region
   repository_id = "postershack"
   format        = "DOCKER"
+  depends_on    = [google_project_service.apis]
 }
 
 # ── GCS bucket ────────────────────────────────────────────────────────────────
 
+resource "google_storage_bucket" "tfstate" {
+  name          = "postershack-tfstate"
+  location      = local.region
+  force_destroy = false
+
+  uniform_bucket_level_access = true
+  versioning { enabled = true }
+}
+
 resource "google_storage_bucket" "images" {
-  name          = "${var.project_id}-postershack-images"
-  location      = var.region
+  name          = "${local.project_id}-images"
+  location      = local.region
   force_destroy = false
 
   uniform_bucket_level_access = true
@@ -40,7 +74,8 @@ resource "google_storage_bucket" "images" {
 # ── Secrets ───────────────────────────────────────────────────────────────────
 
 resource "google_secret_manager_secret" "hf_token" {
-  secret_id = "hf-token"
+  secret_id  = "hf-token"
+  depends_on = [google_project_service.apis]
   replication {
     auto {}
   }
@@ -51,98 +86,15 @@ resource "google_secret_manager_secret_version" "hf_token" {
   secret_data = var.hf_token
 }
 
-# ── Service accounts ──────────────────────────────────────────────────────────
-
-resource "google_service_account" "cloud_run" {
-  account_id   = "${var.app_name}-cr"
-  display_name = "Cloud Run runtime SA for ${var.app_name}"
-}
-
-resource "google_service_account" "github_actions" {
-  account_id   = "${var.app_name}-gh"
-  display_name = "GitHub Actions deploy SA for ${var.app_name}"
-}
-
-# ── IAM: Cloud Run SA ─────────────────────────────────────────────────────────
-
-resource "google_artifact_registry_repository_iam_member" "cloud_run_reader" {
-  repository = google_artifact_registry_repository.images.name
-  location   = google_artifact_registry_repository.images.location
-  role       = "roles/artifactregistry.reader"
-  member     = "serviceAccount:${google_service_account.cloud_run.email}"
-}
-
-resource "google_secret_manager_secret_iam_member" "cloud_run_hf_token" {
-  secret_id = google_secret_manager_secret.hf_token.secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.cloud_run.email}"
-}
-
-resource "google_storage_bucket_iam_member" "cloud_run_storage" {
-  bucket = google_storage_bucket.images.name
-  role   = "roles/storage.objectUser"
-  member = "serviceAccount:${google_service_account.cloud_run.email}"
-}
-
-# ── IAM: GitHub Actions SA (Workload Identity Federation) ────────────────────
-
-resource "google_iam_workload_identity_pool" "github" {
-  workload_identity_pool_id = "github-pool"
-  display_name              = "GitHub Actions"
-}
-
-resource "google_iam_workload_identity_pool_provider" "github" {
-  workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
-  workload_identity_pool_provider_id = "github-provider"
-  display_name                       = "GitHub OIDC"
-
-  attribute_mapping = {
-    "google.subject"       = "assertion.sub"
-    "attribute.repository" = "assertion.repository"
-  }
-
-  attribute_condition = "assertion.repository == '${var.github_repo}'"
-
-  oidc {
-    issuer_uri = "https://token.actions.githubusercontent.com"
-  }
-}
-
-resource "google_service_account_iam_member" "github_wif" {
-  service_account_id = google_service_account.github_actions.name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repo}"
-}
-
-resource "google_project_iam_member" "github_run_developer" {
-  project = var.project_id
-  role    = "roles/run.developer"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
-
-resource "google_artifact_registry_repository_iam_member" "github_ar_writer" {
-  repository = google_artifact_registry_repository.images.name
-  location   = google_artifact_registry_repository.images.location
-  role       = "roles/artifactregistry.writer"
-  member     = "serviceAccount:${google_service_account.github_actions.email}"
-}
-
-# GitHub Actions needs to act as the Cloud Run SA when deploying.
-resource "google_service_account_iam_member" "github_act_as_cr" {
-  service_account_id = google_service_account.cloud_run.name
-  role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.github_actions.email}"
-}
-
 # ── Cloud Run service ─────────────────────────────────────────────────────────
 
 resource "google_cloud_run_v2_service" "app" {
-  name     = var.app_name
-  location = var.region
-  ingress  = "INGRESS_TRAFFIC_ALL"
+  name       = var.app_name
+  location   = local.region
+  ingress    = "INGRESS_TRAFFIC_ALL"
+  depends_on = [google_project_service.apis]
 
   template {
-    service_account = google_service_account.cloud_run.email
 
     scaling {
       min_instance_count = 0
@@ -150,8 +102,8 @@ resource "google_cloud_run_v2_service" "app" {
     }
 
     containers {
-      # Placeholder — CI/CD overwrites the tag on first push.
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/postershack/app3:latest"
+      # Placeholder — CI/CD overwrites this on first push.
+      image = "us-docker.pkg.dev/cloudrun/container/hello:latest"
 
       ports {
         container_port = 7860
