@@ -54,3 +54,4 @@ jobs:
           service: ${{ env.CLOUD_RUN_SERVICE }}
           region: ${{ env.GCP_REGION }}
           image: ${{ env.IMAGE_BASE }}:${{ github.sha }}
+          project_id: postershack
