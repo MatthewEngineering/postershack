@@ -13,6 +13,7 @@ on:
 env:
   # State is stored in GCS — no Pulumi Cloud account needed.
   PULUMI_BACKEND_URL: gs://matthewengineeringgcp-postershack-images/pulumi-state
+  PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
 defaults:
   run:
@@ -46,6 +47,16 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
+      - name: Create GCS state bucket (idempotent)
+        run: |
+          gsutil mb -p matthewengineeringgcp \
+            gs://matthewengineeringgcp-postershack-images || true
+
+      - name: Select or init stack
+        run: |
+          source venv/bin/activate
+          pulumi stack select dev || pulumi stack init dev
+
       - name: Pulumi preview
         if: ${{ inputs.action == 'preview' }}
         uses: pulumi/actions@v6
@@ -53,8 +64,6 @@ jobs:
           command: preview
           stack-name: dev
           work-dir: app3/IaC
-        env:
-          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
       - name: Pulumi up
         if: ${{ inputs.action == 'up' }}
@@ -63,8 +72,6 @@ jobs:
           command: up
           stack-name: dev
           work-dir: app3/IaC
-        env:
-          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
       - name: Pulumi destroy
         if: ${{ inputs.action == 'destroy' }}
@@ -73,32 +80,27 @@ jobs:
           command: destroy
           stack-name: dev
           work-dir: app3/IaC
-        env:
-          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
 
 
 #### ── One-time bootstrap ──────────────────────────────────────────────────────
 #
 # Add these GitHub secrets (Settings → Secrets → Actions):
 #
-#   GCP_CREDENTIALS          — service account key JSON (same as build-and-deploy)
+#   GCP_CREDENTIALS          — service account key JSON
 #   PULUMI_CONFIG_PASSPHRASE — passphrase used to encrypt secret config values
 #                              in Pulumi.dev.yaml (choose any string)
 #
-# Initialize the GCS backend locally once before first CI run:
+# After first `pulumi up`, set the hf_token secret locally and commit:
 #
 #   cd app3/IaC
 #   export PULUMI_BACKEND_URL=gs://matthewengineeringgcp-postershack-images/pulumi-state
 #   export PULUMI_CONFIG_PASSPHRASE=<your-passphrase>
-#   pulumi stack init dev
 #   pulumi config set --secret postershack-app3:hf_token <your-hf-token>
 #
 # Commit the updated Pulumi.dev.yaml — the hf_token will be encrypted.
 
 
-
-
-# --- IaC
+# --- IaC bootstrap commands
 
 # gcloud iam service-accounts create postershack-ci \
 #   --project=matthewengineeringgcp \
