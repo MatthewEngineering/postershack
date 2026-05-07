@@ -5,43 +5,52 @@ import os
 import uuid
 import json
 from datetime import datetime, timezone
-from pathlib import Path
+from io import BytesIO
 
 import gradio as gr
-from huggingface_hub import InferenceClient
+from google.cloud import storage as gcs
+from huggingface_hub import InferenceClient, whoami
 from PIL import Image
 
-LOCAL_DIR = Path("tmp")
-METADATA_FILE = LOCAL_DIR / "metadata.json"
+_gcs_client = gcs.Client(project=os.environ["GOOGLE_CLOUD_PROJECT"])
+_bucket = _gcs_client.bucket(os.environ["GCS_BUCKET_NAME"])
+METADATA_BLOB = "metadata.json"
 
 client = InferenceClient(
-    provider="nscale",
+    # provider="nscale",
     api_key=os.environ["HF_TOKEN"],
 )
+
+try:
+    _hf_user = whoami(token=os.environ["HF_TOKEN"])["name"]
+    HF_STATUS = f'<span style="color:green">&#10003; Connected as {_hf_user}</span>'
+except Exception:
+    HF_STATUS = '<span style="color:red">&#10007; HuggingFace connection failed</span>'
 
 
 def load_metadata() -> list:
     try:
-        return json.loads(METADATA_FILE.read_text())
+        return json.loads(_bucket.blob(METADATA_BLOB).download_as_text())
     except Exception:
         return []
 
 
 def save_image(image, prompt: str):
-    LOCAL_DIR.mkdir(exist_ok=True)
     name = f"{uuid.uuid4()}.png"
-    image.save(LOCAL_DIR / name, format="PNG")
+    buf = BytesIO()
+    image.save(buf, format="PNG")
+    _bucket.blob(name).upload_from_string(buf.getvalue(), content_type="image/png")
     records = load_metadata()
     records.insert(0, {"file": name, "prompt": prompt, "ts": datetime.now(timezone.utc).isoformat()})
-    METADATA_FILE.write_text(json.dumps(records))
+    _bucket.blob(METADATA_BLOB).upload_from_string(json.dumps(records), content_type="application/json")
 
 
-# TODO: modify this to be from the gcp bucket if STORAGE_MODE=gcp instead of STORAGE_MODE=local
 def load_gallery() -> list:
     images = []
     for r in load_metadata()[:20]:
         try:
-            images.append((Image.open(LOCAL_DIR / r["file"]), r["prompt"]))
+            data = _bucket.blob(r["file"]).download_as_bytes()
+            images.append((Image.open(BytesIO(data)), r["prompt"]))
         except Exception:
             continue
     return images
@@ -55,7 +64,9 @@ def generate_image(prompt: str):
     return image
 
 
-with gr.Blocks(title="Postershack — Image Generator", theme=gr.themes.Soft(), css="footer { display: none !important; }") as demo:
+# with gr.Blocks(title="Postershack — Image Generator", theme=gr.themes.Soft(), css="footer { display: none !important; }") as demo:
+with gr.Blocks(title="Postershack — Image Generator") as demo:
+
     gr.Markdown("# Postershack Image Generator")
 
     with gr.Tabs():
@@ -70,6 +81,7 @@ with gr.Blocks(title="Postershack — Image Generator", theme=gr.themes.Soft(), 
             gr.Markdown(
                 "Designed using FLUX.1-schnell via HuggingFace Inference &nbsp;|&nbsp; "
                 "[Model](https://huggingface.co/black-forest-labs/FLUX.1-schnell)"
+                f" &nbsp;|&nbsp; {HF_STATUS}"
             )
             with gr.Row():
                 with gr.Column(scale=1):

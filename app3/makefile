@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 
 # ── Config — override on the command line: make build IMAGE=myrepo/myapp ──────
-IMAGE  ?= huggingface-app
+IMAGE  ?= huggingface-app3
 TAG    ?= latest
 
 # ── Docker ────────────────────────────────────────────────────────────────────
@@ -14,11 +14,10 @@ build:
 # Run locally — mounts a model cache so re-runs don't re-download weights
 run:
 	docker run -d \
-		--name $(IMAGE)1 \
-		-p 7860:7860 \
+		-p 8080:8080 \
 		--env-file .env \
-		$(IMAGE):$(TAG)
-	@echo "Running at http://localhost:7860"
+		$(IMAGE)
+	@echo "Running at http://localhost:8080"
 
 # Stop and remove the container
 stop:
