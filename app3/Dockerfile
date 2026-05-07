@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py .
+COPY app.py gallery.py ./
 
 # Gradio listens on 7860; Cloud Run routes to this port
 EXPOSE 8080

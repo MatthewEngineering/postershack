@@ -16,6 +16,8 @@ run:
 	docker run -d \
 		-p 8080:8080 \
 		--env-file .env \
+		-v $(HOME)/.config/gcloud/application_default_credentials.json:/tmp/adc.json:ro \
+		-e GOOGLE_APPLICATION_CREDENTIALS=/tmp/adc.json \
 		$(IMAGE)
 	@echo "Running at http://localhost:8080"
 
