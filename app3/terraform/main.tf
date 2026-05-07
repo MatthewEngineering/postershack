@@ -102,7 +102,7 @@ resource "google_cloud_run_v2_service" "app" {
   template {
     scaling {
       min_instance_count = 0
-      max_instance_count = var.max_instances
+      max_instance_count = 1
     }
 
     containers {

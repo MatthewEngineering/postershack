@@ -4,12 +4,6 @@ variable "app_name" {
   default     = "postershack-api"
 }
 
-variable "max_instances" {
-  description = "Maximum Cloud Run instances to scale out to"
-  type        = number
-  default     = 1
-}
-
 variable "hf_token" {
   description = "HuggingFace API token"
   type        = string
