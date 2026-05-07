@@ -1,20 +1,11 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-import os
-import uuid
-import json
-from datetime import datetime, timezone
-from io import BytesIO
-
 import gradio as gr
-from google.cloud import storage as gcs
 from huggingface_hub import InferenceClient, whoami
-from PIL import Image
+import os
 
-_gcs_client = gcs.Client(project=os.environ["GOOGLE_CLOUD_PROJECT"])
-_bucket = _gcs_client.bucket(os.environ["GCS_BUCKET_NAME"])
-METADATA_BLOB = "metadata.json"
+from gallery import save_image, load_gallery_with_meta, build_tab
 
 client = InferenceClient(
     # provider="nscale",
@@ -26,34 +17,6 @@ try:
     HF_STATUS = f'<span style="color:green">&#10003; Connected as {_hf_user}</span>'
 except Exception:
     HF_STATUS = '<span style="color:red">&#10007; HuggingFace connection failed</span>'
-
-
-def load_metadata() -> list:
-    try:
-        return json.loads(_bucket.blob(METADATA_BLOB).download_as_text())
-    except Exception:
-        return []
-
-
-def save_image(image, prompt: str):
-    name = f"{uuid.uuid4()}.png"
-    buf = BytesIO()
-    image.save(buf, format="PNG")
-    _bucket.blob(name).upload_from_string(buf.getvalue(), content_type="image/png")
-    records = load_metadata()
-    records.insert(0, {"file": name, "prompt": prompt, "ts": datetime.now(timezone.utc).isoformat()})
-    _bucket.blob(METADATA_BLOB).upload_from_string(json.dumps(records), content_type="application/json")
-
-
-def load_gallery() -> list:
-    images = []
-    for r in load_metadata()[:20]:
-        try:
-            data = _bucket.blob(r["file"]).download_as_bytes()
-            images.append((Image.open(BytesIO(data)), r["prompt"]))
-        except Exception:
-            continue
-    return images
 
 
 def generate_image(prompt: str):
@@ -71,11 +34,7 @@ with gr.Blocks(title="Postershack — Image Generator") as demo:
 
     with gr.Tabs():
 
-        with gr.TabItem("Gallery"):
-            refresh_btn = gr.Button("Refresh", variant="secondary")
-            gallery = gr.Gallery(label="Previously generated images", columns=3, object_fit="cover", height="auto")
-            refresh_btn.click(fn=load_gallery, inputs=[], outputs=gallery)
-
+        gallery, gallery_meta = build_tab()
 
         with gr.TabItem("Generate"):
             gr.Markdown(
@@ -142,6 +101,8 @@ with gr.Blocks(title="Postershack — Image Generator") as demo:
                 "## Billing\n"
                 "[View HuggingFace Billing](https://huggingface.co/settings/billing)"
             )
+
+    demo.load(fn=load_gallery_with_meta, outputs=[gallery, gallery_meta])
 
 if __name__ == "__main__":
     demo.launch()
