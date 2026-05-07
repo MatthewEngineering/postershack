@@ -114,6 +114,10 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       env {
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = local.project_id
+      }
+      env {
         name  = "GRADIO_SERVER_NAME"
         value = "0.0.0.0"
       }
