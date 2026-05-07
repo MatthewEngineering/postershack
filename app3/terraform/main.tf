@@ -146,7 +146,7 @@ resource "google_cloud_run_v2_service" "app" {
       resources {
         limits = {
           cpu    = "1"
-          memory = "2Gi"
+          memory = "1Gi"
         }
       }
     }
